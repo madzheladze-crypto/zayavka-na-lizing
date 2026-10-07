@@ -3,13 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b6e75">
+<meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10171d" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Заявка на Лизинг">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>html{padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <script>window.STANDALONE=true;if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
 </head>
 <body>
@@ -112,6 +114,33 @@ button.voice[aria-pressed="true"] .mic{background:var(--bad);animation:pulse 1.1
 .dot{width:8px;height:8px;border-radius:50%;background:var(--c);display:inline-block;flex:none}
 .dot.wait{--c:var(--warn)} .dot.due{--c:var(--ok)} .dot.late{--c:var(--bad)}
 .empty{padding:20px 14px;color:var(--muted)}
+/* Телефон (iPhone 14 Pro: 393 × 852) */
+@media (max-width:760px){
+  body{font-size:16px;-webkit-text-size-adjust:100%}
+  .wrap{padding-block:14px 32px;gap:16px}
+  h1{font-size:20px}
+  header p{font-size:14px}
+  textarea,input{font-size:16px;padding:11px 12px}          /* 16px: iOS не увеличивает страницу при вводе */
+  input{min-height:46px}
+  input[type="datetime-local"]{-webkit-appearance:none;appearance:none;display:block;text-align:left}
+  .card{padding:14px 12px;gap:12px}
+  .row,.row.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+  .row:first-child{grid-template-columns:minmax(0,1fr)}
+  button,.btn{min-height:44px}
+  button.ghost,button.voice{min-height:40px;padding-inline:10px;font-size:14px}
+  .card .actions{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+  .card .actions button{justify-content:center}
+  .views{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);margin-inline:-16px;padding-inline:8px}
+  .views button{flex:1 1 0;justify-content:center;padding:10px 6px;font-size:14.5px;white-space:nowrap}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;margin-inline:-16px;padding-inline:16px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{flex:none;min-height:40px;white-space:nowrap}
+  .examples{display:none}
+  .item{padding:14px 12px;gap:10px}
+  .item .actions button.ghost{min-height:36px}
+  .dd-row input{flex-basis:100%}
+  .dd-row button{flex:1}
+}
 </style>
 
 <div class="wrap">
@@ -136,7 +165,7 @@ button.voice[aria-pressed="true"] .mic{background:var(--bad);animation:pulse 1.1
         </span>
       </div>
       <textarea id="src" spellcheck="false" aria-label="Текст заявки"></textarea>
-      <p class="hint">Понимает: «ИНН 7707083893», «+7 916 123-45-67», «меня зовут Иван Петров», «аванс 30%», «предоплата 500 тыс», «срок до 25 октября», «через 2 недели», «срок 3-5 лет», «6-12 месяцев», «аванс 10-20-30», «срок 12-24-36», «на 3 5 7 лет», «перезвонить завтра в 11», «позвонить 9 октября 15 30», «набрать в пятницу после обеда».</p>
+      <p class="hint examples">Понимает: «ИНН 7707083893», «+7 916 123-45-67», «меня зовут Иван Петров», «аванс 30%», «предоплата 500 тыс», «срок до 25 октября», «через 2 недели», «срок 3-5 лет», «6-12 месяцев», «аванс 10-20-30», «срок 12-24-36», «на 3 5 7 лет», «перезвонить завтра в 11», «позвонить 9 октября 15 30», «набрать в пятницу после обеда».</p>
     </div>
 
     <div class="pane">
@@ -160,7 +189,7 @@ button.voice[aria-pressed="true"] .mic{background:var(--bad);animation:pulse 1.1
           </div>
           <div class="field">
             <label for="f-phone">Телефон</label>
-            <input id="f-phone" type="tel" inputmode="tel" placeholder="+7 900 000-00-00" autocomplete="off">
+            <input id="f-phone" type="tel" inputmode="tel" placeholder="Не указан" autocomplete="off">
           </div>
         </div>
         <div class="dd" id="dd-box" hidden>
@@ -206,7 +235,7 @@ button.voice[aria-pressed="true"] .mic{background:var(--bad);animation:pulse 1.1
     </div>
     <div class="list" id="list"><div class="empty">Здесь появятся сохранённые заявки. Заполните карточку и нажмите «Сохранить заявку».</div></div>
   </section>
-  <p class="hint ver">Версия 16 · 07.10.2026</p>
+  <p class="hint ver">Версия 17 · 07.10.2026</p>
 </div>
 
 <script>
