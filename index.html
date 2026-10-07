@@ -46,7 +46,7 @@ h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;
 .pane{display:flex;flex-direction:column;gap:10px;min-width:0}
 .pane-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;min-height:28px}
 textarea,input{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;width:100%;min-width:0}
-textarea{min-height:300px;resize:vertical;line-height:1.5}
+textarea{min-height:150px;resize:vertical;line-height:1.5}
 textarea:focus,input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px}
 .card input,.card textarea{background:var(--sunken);border-color:transparent}
@@ -94,6 +94,11 @@ button.ghost{border-color:transparent;background:transparent;color:var(--muted);
 .item .actions button.link{color:var(--accent);padding:0}
 .item .actions button.ghost{padding-inline:0}
 .lbl{font-size:12px;font-weight:600;color:var(--muted)}
+.views{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.views button{border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;color:var(--muted);padding:8px 14px;margin-bottom:-1px;font-size:15px}
+.views button:hover{color:var(--fg)}
+.views button[aria-current="page"]{color:var(--fg);border-bottom-color:var(--accent)}
+.views .n{font-variant-numeric:tabular-nums;font-size:12.5px;background:var(--sunken);border-radius:999px;padding:1px 8px;color:var(--fg)}
 .tabs{display:flex;flex-wrap:wrap;gap:6px}
 .tabs button{font-weight:500;font-size:13.5px;padding:6px 12px;border-radius:999px;background:transparent}
 .tabs button[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
@@ -109,7 +114,12 @@ button.ghost{border-color:transparent;background:transparent;color:var(--muted);
     <p>Вставьте текст заявки. Поля заполнятся сами, их можно поправить вручную.</p>
   </header>
 
-  <section class="desk">
+  <nav class="views" id="views" aria-label="Разделы">
+    <button type="button" data-view="new" aria-current="page">Новая заявка</button>
+    <button type="button" data-view="saved">Сохранённые заявки <span class="n" id="n-nav">0</span></button>
+  </nav>
+
+  <section class="desk" id="view-new">
     <div class="pane">
       <div class="pane-head">
         <h2>Текст заявки</h2>
@@ -179,7 +189,7 @@ button.ghost{border-color:transparent;background:transparent;color:var(--muted);
     </div>
   </section>
 
-  <section class="journal">
+  <section class="journal" id="view-saved" hidden>
     <div class="pane-head"><h2>Сохранённые заявки</h2><span class="status" id="store-note"></span></div>
     <div class="tabs" id="tabs" role="tablist" aria-label="Фильтр заявок">
       <button type="button" role="tab" data-tab="all" aria-selected="true">Все заявки <span class="n" id="n-all">0</span></button>
@@ -525,7 +535,7 @@ $("card").addEventListener("submit",async(ev)=>{
   if(!rec.inn&&!rec.need&&!rec.company&&!rec.name&&!rec.phone){status("Нечего сохранять: заполните хотя бы одно поле");return;}
   if(rec.inn&&!innValid(rec.inn)){status("ИНН не проходит проверку. Исправьте его или очистите поле.");F.inn.focus();return;}
   const b=$("btn-save"); b.disabled=true; status("Сохраняю…");
-  try{ await saveRecord(rec); status("Сохранено"); if(rec.inn&&rec.company){setTag($("co-tag"),"из ваших клиентов","ok");$("co-hint").hidden=true;} }
+  try{ await saveRecord(rec); status("Сохранено. Заявка в разделе «Сохранённые заявки»"); if(rec.inn&&rec.company){setTag($("co-tag"),"из ваших клиентов","ok");$("co-hint").hidden=true;} }
   catch(e){ status(e&&e.code==="quota_exceeded"?"Хранилище заполнено. Удалите старые заявки.":"Не удалось сохранить. Попробуйте ещё раз."); }
   b.disabled=false;
 });
@@ -553,6 +563,7 @@ function renderList(){
   const stOf=r=>{const st=callState(r.call,now);return st?st.cls:"";};
   for(const r of items){const c=stOf(r); if(c) cnt[c]++;}
   for(const k in cnt) $("n-"+k).textContent=cnt[k];
+  $("n-nav").textContent=cnt.all;
   const shown=tab==="all"?items:items.filter(r=>stOf(r)===tab);
   if(items.length&&!shown.length){box.append(el("div","empty",{due:"Сейчас нет заявок, по которым пора звонить.",wait:"Нет заявок с предстоящим звонком.",late:"Просроченных звонков нет."}[tab]));return;}
   if(!items.length){box.append(el("div","empty","Здесь появятся сохранённые заявки. Заполните карточку и нажмите «Сохранить заявку»."));return;}
@@ -575,6 +586,12 @@ $("dd-save").addEventListener("click",()=>{
   $("dd-key").value=""; renderDD(); lastInn=null; onInn().then(refreshCal);
 });
 renderDD();
+function showView(v){
+  $("view-new").hidden=v!=="new"; $("view-saved").hidden=v!=="saved";
+  for(const x of $("views").querySelectorAll("button")){ if(x.dataset.view===v) x.setAttribute("aria-current","page"); else x.removeAttribute("aria-current"); }
+  if(v==="saved") renderList();
+}
+$("views").addEventListener("click",ev=>{const b=ev.target.closest("button[data-view]"); if(b) showView(b.dataset.view);});
 $("tabs").addEventListener("click",ev=>{
   const b=ev.target.closest("button[data-tab]"); if(!b) return;
   tab=b.dataset.tab; armed=null;
