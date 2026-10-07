@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b6e75">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Заявка на Лизинг">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<script>window.STANDALONE=true;if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
+</head>
+<body>
+<title>Заявка на Лизинг</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: рабочий стол менеджера. Слева сырой текст клиента, справа карточка с полями, ниже журнал заявок. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --sunken:#e4e9ee; --line:#cfd7df;
+  --fg:#16222e; --muted:#5b6b7a; --accent:#0b6e75; --accent-fg:#ffffff; --accent-soft:#d9eeef;
+  --ok:#1f7a4a; --warn:#a15c00; --bad:#b3261e;
+  --font:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#10171d; --surface:#19232c; --sunken:#131c24; --line:#2c3a47;
+  --fg:#e6edf3; --muted:#93a3b2; --accent:#4fc3c9; --accent-fg:#06282b; --accent-soft:#17383c;
+  --ok:#5fcf93; --warn:#f0b35a; --bad:#ff8a80; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#10171d; --surface:#19232c; --sunken:#131c24; --line:#2c3a47;
+  --fg:#e6edf3; --muted:#93a3b2; --accent:#4fc3c9; --accent-fg:#06282b; --accent-soft:#17383c;
+  --ok:#5fcf93; --warn:#f0b35a; --bad:#ff8a80; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.45}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:24px 48px;display:flex;flex-direction:column;gap:24px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted)}
+h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0}
+.desk{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:16px;align-items:start}
+@media (max-width:760px){.desk{grid-template-columns:minmax(0,1fr)}}
+.pane{display:flex;flex-direction:column;gap:10px;min-width:0}
+.pane-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;min-height:28px}
+textarea,input{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;width:100%;min-width:0}
+textarea{min-height:300px;resize:vertical;line-height:1.5}
+textarea:focus,input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px}
+.card input,.card textarea{background:var(--sunken);border-color:transparent}
+.card textarea{min-height:76px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label{font-size:12.5px;font-weight:600;color:var(--muted);display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:12px}
+.row.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+@media (max-width:460px){.row,.row.even{grid-template-columns:minmax(0,1fr)}}
+#f-inn{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.tag{font-weight:500;font-size:12px}
+.tag.ok{color:var(--ok)} .tag.warn{color:var(--warn)} .tag.bad{color:var(--bad)}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.hint a{color:var(--accent)}
+.dd{display:flex;flex-direction:column;gap:6px}
+.dd-row{display:flex;gap:8px;flex-wrap:wrap}
+.dd-row input{flex:1 1 220px;font-family:var(--mono);font-size:13px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.btn{font:inherit;font-weight:600;font-size:14px;border-radius:var(--r);padding:8px 14px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+button:hover,.btn:hover{border-color:var(--accent)}
+.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.cal{background:var(--accent-soft);border-color:transparent;color:var(--fg)}
+.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
+button.ghost{border-color:transparent;background:transparent;color:var(--muted);padding:4px 8px;font-weight:500;font-size:13px}
+.status{font-size:13px;color:var(--muted)}
+.example{font-size:12px;color:var(--warn);font-weight:500}
+.journal{display:flex;flex-direction:column;gap:10px}
+.list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.item{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,2fr) minmax(0,1.4fr) auto;gap:6px 16px;padding:12px 14px;border-top:1px solid var(--line);align-items:start}
+.item:first-child{border-top:0}
+@media (max-width:760px){.item{grid-template-columns:minmax(0,1fr)}}
+.item>div{min-width:0;overflow-wrap:anywhere}
+.co{font-weight:600}
+.sub{font-size:12.5px;color:var(--muted)}
+.kv.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px}
+.sub.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.kv{font-size:13.5px}
+.kv b{font-weight:600;color:var(--muted);font-size:12px}
+.kv.call{margin-top:4px;padding:5px 8px;border-radius:var(--r);border-left:3px solid var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
+.kv.call .pill{display:inline-block;font-size:12px;font-weight:600;color:var(--c);white-space:nowrap}
+.kv.call.wait{--c:var(--warn)} .kv.call.due{--c:var(--ok)} .kv.call.late{--c:var(--bad)}
+.item .actions{flex-direction:column;align-items:flex-start;gap:4px}
+@media (max-width:760px){.item .actions{flex-direction:row;gap:12px}}
+.item .actions a{font-size:13px;color:var(--accent)}
+.item .actions button.link{color:var(--accent);padding:0}
+.item .actions button.ghost{padding-inline:0}
+.lbl{font-size:12px;font-weight:600;color:var(--muted)}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabs button{font-weight:500;font-size:13.5px;padding:6px 12px;border-radius:999px;background:transparent}
+.tabs button[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.tabs .n{font-variant-numeric:tabular-nums;opacity:.7;font-size:12.5px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--c);display:inline-block;flex:none}
+.dot.wait{--c:var(--warn)} .dot.due{--c:var(--ok)} .dot.late{--c:var(--bad)}
+.empty{padding:20px 14px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Заявка на Лизинг</h1>
+    <p>Вставьте текст заявки. Поля заполнятся сами, их можно поправить вручную.</p>
+  </header>
+
+  <section class="desk">
+    <div class="pane">
+      <div class="pane-head">
+        <h2>Текст заявки</h2>
+        <span>
+          <span class="example" id="example-mark">пример</span>
+          <button class="ghost" id="btn-clear" type="button">Очистить</button>
+        </span>
+      </div>
+      <textarea id="src" spellcheck="false" aria-label="Текст заявки"></textarea>
+      <p class="hint">Понимает: «ИНН 7707083893», «+7 916 123-45-67», «меня зовут Иван Петров», «аванс 30%», «предоплата 500 тыс», «срок до 25 октября», «через 2 недели», «срок 3-5 лет», «6-12 месяцев», «аванс 10-20-30», «срок 12-24-36», «на 3 5 7 лет», «перезвонить завтра в 11», «позвонить 9 октября 15 30», «набрать в пятницу после обеда».</p>
+    </div>
+
+    <div class="pane">
+      <div class="pane-head"><h2>Карточка заявки</h2><span class="status" id="status" role="status"></span></div>
+      <form class="card" id="card" autocomplete="off">
+        <div class="row">
+          <div class="field">
+            <label for="f-inn">ИНН <span class="tag" id="inn-tag"></span></label>
+            <input id="f-inn" inputmode="numeric" maxlength="12" placeholder="10 или 12 цифр">
+          </div>
+          <div class="field">
+            <label for="f-company">Компания <span class="tag" id="co-tag"></span></label>
+            <input id="f-company" placeholder="Подставится по ИНН">
+          </div>
+        </div>
+        <p class="hint" id="co-hint" hidden></p>
+        <div class="row even">
+          <div class="field">
+            <label for="f-name">Имя клиента</label>
+            <input id="f-name" placeholder="Не указано" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="f-phone">Телефон</label>
+            <input id="f-phone" type="tel" inputmode="tel" placeholder="+7 900 000-00-00" autocomplete="off">
+          </div>
+        </div>
+        <div class="dd" id="dd-box" hidden>
+          <p class="hint" id="dd-text"></p>
+          <div class="dd-row" id="dd-form">
+            <input id="dd-key" placeholder="API-ключ DaData" spellcheck="false" autocomplete="off">
+            <button type="button" id="dd-save">Подключить</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-need">Потребность</label>
+          <textarea id="f-need" placeholder="Что нужно клиенту"></textarea>
+        </div>
+        <div class="row even">
+          <div class="field">
+            <label for="f-advance">Аванс</label>
+            <input id="f-advance" placeholder="Не указан">
+          </div>
+          <div class="field">
+            <label for="f-term">Срок <span class="tag" id="term-tag"></span></label>
+            <input id="f-term" placeholder="Не указан">
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-call">Позвонить <span class="tag" id="call-tag"></span></label>
+          <input id="f-call" type="datetime-local">
+        </div>
+        <div class="actions">
+          <button class="primary" type="submit" id="btn-save">Сохранить заявку</button>
+          <button type="button" id="btn-copy">Скопировать</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="journal">
+    <div class="pane-head"><h2>Сохранённые заявки</h2><span class="status" id="store-note"></span></div>
+    <div class="tabs" id="tabs" role="tablist" aria-label="Фильтр заявок">
+      <button type="button" role="tab" data-tab="all" aria-selected="true">Все заявки <span class="n" id="n-all">0</span></button>
+      <button type="button" role="tab" data-tab="due" aria-selected="false"><i class="dot due"></i>Пора звонить <span class="n" id="n-due">0</span></button>
+      <button type="button" role="tab" data-tab="wait" aria-selected="false"><i class="dot wait"></i>Ещё рано <span class="n" id="n-wait">0</span></button>
+      <button type="button" role="tab" data-tab="late" aria-selected="false"><i class="dot late"></i>Просрочена активность <span class="n" id="n-late">0</span></button>
+    </div>
+    <div class="list" id="list"><div class="empty">Здесь появятся сохранённые заявки. Заполните карточку и нажмите «Сохранить заявку».</div></div>
+  </section>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const EXAMPLE="Добрый день! ООО, ИНН 7707083893. Нужно 20 тонн арматуры А500С 12 мм с доставкой на объект в Химках, разгрузка наша. Аванс готовы 30%, остальное по факту. Срок поставки до 25 октября. Перезвоните завтра после обеда, обсудим цену.";
+const BUILTIN={"7707083893":"ПАО Сбербанк"}; // только для примера
+
+/* ---------- ИНН ---------- */
+function innValid(s){
+  if(!/^\d{10}$|^\d{12}$/.test(s)) return false;
+  const d=[...s].map(Number), cs=(k)=>k.reduce((a,c,i)=>a+c*d[i],0)%11%10;
+  if(s.length===10) return cs([2,4,10,3,5,9,4,6,8])===d[9];
+  return cs([7,2,4,10,3,5,9,4,6,8])===d[10] && cs([3,7,2,4,10,3,5,9,4,6,8])===d[11];
+}
+function findInn(text){
+  const m=text.match(/инн\s*[:№#-]?\s*(\d{12}|\d{10})(?!\d)/i);
+  if(m) return {inn:m[1],raw:m[0]};
+  const all=[...text.matchAll(/(?<!\d)(\d{12}|\d{10})(?!\d)/g)].map(x=>x[1]);
+  const v=all.find(innValid);
+  return v?{inn:v,raw:v}:null;
+}
+
+/* ---------- Даты ---------- */
+const MONTHS=["янв","фев","мар","апр","ма","июн","июл","авг","сен","окт","ноя","дек"];
+const MON_RE="(январ\\S*|феврал\\S*|март\\S*|апрел\\S*|ма[йя]|июн\\S*|июл\\S*|август\\S*|сентябр\\S*|октябр\\S*|ноябр\\S*|декабр\\S*)";
+const WD=[["воскресень",0],["понедельник",1],["вторник",2],["сред",3],["четверг",4],["пятниц",5],["суббот",6]];
+function monthIdx(w){w=w.toLowerCase(); if(/^ма[йя]$/.test(w)) return 4; return MONTHS.findIndex((m,i)=>i!==4&&w.startsWith(m));}
+function parseWhen(str,now){
+  const s=" "+str.toLowerCase().replace(/ё/g,"е")+" ";
+  let d=null,timeSet=false,m,after=null;
+  const day0=()=>new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const add=(n)=>{const x=day0();x.setDate(x.getDate()+n);return x;};
+  const num=(w)=>w==null||w===""?1:(/пар/.test(w)?2:parseInt(w,10));
+  const mark=(mm)=>{after=s.slice(mm.index+mm[0].length);};
+  if((m=s.match(/послезавтра/))){d=add(2);mark(m);}
+  else if((m=s.match(/завтра/))){d=add(1);mark(m);}
+  else if((m=s.match(/сегодня/))){d=add(0);mark(m);}
+  if(!d && (m=s.match(/(?:через|в течение|в течении)\s+(\d+|пару)?\s*(рабоч\S*\s+)?(час|минут|дн|день|дня|недел|месяц)/))){
+    const n=num(m[1]);
+    if(m[3]==="час"){d=new Date(now.getTime()+n*36e5);timeSet=true;}
+    else if(m[3]==="минут"){d=new Date(now.getTime()+n*6e4);timeSet=true;}
+    else if(m[3]==="недел") d=add(n*7);
+    else if(m[3]==="месяц"){d=day0();d.setMonth(d.getMonth()+n);}
+    else d=add(n);
+  }
+  if(!d && (m=s.match(/(\d{1,2})[.\/](\d{1,2})(?:[.\/](\d{4}|\d{2}))?(?!\d)/)) && +m[2]>=1 && +m[2]<=12 && +m[1]>=1 && +m[1]<=31){
+    let y=m[3]?+m[3]:now.getFullYear(); if(y<100) y+=2000;
+    d=new Date(y,+m[2]-1,+m[1]); if(!m[3] && d<day0()) d.setFullYear(y+1); mark(m);
+  }
+  if(!d && (m=s.match(new RegExp("(\\d{1,2})(?:-?го)?\\s+"+MON_RE+"(?:\\s+(\\d{4})(?:\\s*г(?:ода|\\.)?)?)?")))){
+    const mi=monthIdx(m[2]);
+    if(mi>=0){const y=m[3]?+m[3]:now.getFullYear(); d=new Date(y,mi,+m[1]); if(!m[3] && d<day0()) d.setFullYear(y+1); mark(m);}
+  }
+  if(!d){
+    for(const [w,i] of WD){ const mm=s.match(new RegExp(w+"[а-я]*")); if(mm){ let diff=(i-now.getDay()+7)%7; if(diff===0) diff=7; d=add(diff); mark(mm); break; } }
+  }
+  if(!d && /конц\S* недели/.test(s)){ d=add((5-now.getDay()+7)%7); }
+  if(!d && /конц\S* месяца/.test(s)){ d=new Date(now.getFullYear(),now.getMonth()+1,0); }
+  if(!d && /следующ\S* недел/.test(s)){ d=add(((1-now.getDay()+7)%7)||7); }
+  if(!d && /следующ\S* месяц/.test(s)){ d=new Date(now.getFullYear(),now.getMonth()+1,1); }
+  // время
+  let h=null,mi=0,t;
+  // цифры сразу после даты — это время: «9 октября 15», «завтра 11 30», «10.10 в 15 30», «в пятницу 1530»
+  const tail=after==null?null:after.match(/^\s*(?:(?:в|на|к|около)\s+)?(?:([01]\d|2[0-3])([0-5]\d)|(\d{1,2})(?:\s*[ .:\-]\s*([0-5]\d)|\s*(?:час[а-я]*|ч\.?)\s*([0-5]\d)?)?)(?!\d)(?!\s*\d)(?!\s*(?:раз|дн|недел|мес|лет|год|%|тыс|млн|руб|шт|тонн))/);
+  if((m=s.match(/(?<!\d)([01]?\d|2[0-3])[:\-]([0-5]\d)(?!\d)/))){h=+m[1];mi=+m[2];}
+  else if(tail && (tail[1]!=null || +tail[3]<=23)){
+    if(tail[1]!=null){h=+tail[1];mi=+tail[2];}
+    else{ h=+tail[3]; t=tail[4]!=null?tail[4]:tail[5]; if(t!=null) mi=+t; else if(h>=1&&h<=7&&!/утра|ночи/.test(after)) h+=12; if(/вечера|дня/.test(after)&&h<12) h+=12; }
+  }
+  else if((m=s.match(new RegExp("\\s(?:в|на|к|около|до|после)\\s+(\\d{1,2})(?![\\d.\\/:])(?!\\s*"+MON_RE+")(?!\\s*(?:числ|дн|недел|месяц|рабоч))\\s*(утра|вечера|дня|ночи|час\\S*|ч)?")))&& +m[1]<=24){
+    h=+m[1]%24; if(m[3]&&/вечера|дня/.test(m[3])&&h<12) h+=12;
+    else if(!m[3]&&h>=1&&h<=7) h+=12;
+  }
+  else if(/утр/.test(s)) h=10;
+  else if(/до обеда/.test(s)) h=11;
+  else if(/после обеда/.test(s)) h=14;
+  else if(/в обед|днем/.test(s)) h=13;
+  else if(/вечер/.test(s)) h=17;
+  if(h!==null && !timeSet){ if(!d) d=add(0); d.setHours(h,mi,0,0); timeSet=true; if(d<now && !/сегодня/.test(s) && after==null) d.setDate(d.getDate()+1); }
+  return d?{date:d,timeSet}:null;
+}
+const p2=n=>String(n).padStart(2,"0");
+const fmtDate=d=>p2(d.getDate())+"."+p2(d.getMonth()+1)+"."+d.getFullYear();
+const toLocalInput=d=>d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())+"T"+p2(d.getHours())+":"+p2(d.getMinutes());
+function fmtDT(v){ if(!v) return ""; const d=new Date(v); if(isNaN(d)) return ""; return fmtDate(d)+" в "+p2(d.getHours())+":"+p2(d.getMinutes()); }
+
+/* ---------- Деньги ---------- */
+function findMoney(s){
+  const m=s.match(/(\d[\d\s ]*(?:[.,]\d+)?)\s*(млн|миллион\S*|тыс\S*|т\.\s?р\.?|к(?![а-яёa-z])|руб\S*|р\.|₽)/i);
+  if(!m) return null;
+  let n=parseFloat(m[1].replace(/[\s ]/g,"").replace(",","."));
+  const u=m[2].toLowerCase();
+  if(/^(млн|миллион)/.test(u)) n*=1e6; else if(/^(тыс|т\.|к)/.test(u)) n*=1e3;
+  if(!isFinite(n)) return null;
+  return Math.round(n).toLocaleString("ru-RU")+" ₽";
+}
+
+/* ---------- Разбор ---------- */
+const RE_CALL=/позвон|перезвон|созвон|набрат|набер|наберу|связаться|свяжитесь|звонок|звонить/i;
+const RE_ADV=/аванс|предоплат/i;
+const RE_TERM_START=/^\s*(срок|дедлайн|поставк\S*\s+(?:до|к|через|в течени)|до\s+\d|до\s+конц|к\s+\d|через\s+(?:\d|пару|недел|месяц)|в течени[еи]|не позднее|на следующ)/i;
+const RE_TERM_IN=new RegExp("(?:не позднее|до|к|через|в течени[еи])\\s+(?:конц\\S*\\s+\\S+|(?:\\d+|пару)\\s*(?:рабоч\\S*\\s+)?(?:дн\\S*|день|дня|недел\\S*|месяц\\S*)|\\d{1,2}[./]\\d{1,2}(?:[./]\\d{2,4})?|\\d{1,2}(?:-?го)?\\s+"+MON_RE+"(?:\\s+\\d{4})?)","i");
+/* Срок-диапазон: «3-5 лет», «6-12 месяцев», «6 12 месяцев», «срок 3-5» */
+function findRange(seg){
+  let m=seg.match(/(?<!\d)(\d{1,3})\s*(?:[-–—]|\s)\s*(\d{1,3})\s*(лет|года|год|мес\.?|месяц[а-яё]*)(?![а-яё])/i);
+  if(m && +m[1]<+m[2]) return m[1]+"–"+m[2]+" "+m[3].toLowerCase();
+  m=seg.match(/срок[а-яё]*(?:\s+(?:поставки|кредита|лизинга|договора|аренды|займа|рассрочки))?\s*[:—–-]?\s*(\d{1,3})\s*[-–—]\s*(\d{1,3})(?![\d.\/:])/i);
+  if(m && +m[1]<+m[2]) return m[1]+"–"+m[2];
+  return null;
+}
+/* Несколько чисел после «срок» или «на»: «срок 12-24-36», «на 3 5 7 лет», «на 12, 24 месяца» */
+const RE_SEQ=new RegExp("(?<![а-яёa-z])(срок[а-яё]*(?:\\s+(?:поставки|кредита|лизинга|договора|аренды|займа|рассрочки))?\\s*[:—–-]?|на)\\s+(\\d{1,3}(?:(?:\\s*[-–—,]\\s*|\\s+(?:и|или|до)\\s+|\\s+)\\d{1,3})*)(?![\\d.\\/:])(?!\\s*%)(?!\\s+"+MON_RE.replace("(","(?:")+")(?:\\s*(лет|года|год|мес\\.?|месяц[а-яё]*|дн[а-яё]*|день|дня|недел[а-яё]*)(?![а-яё]))?","gi");
+function findSeq(text){
+  for(const m of text.matchAll(RE_SEQ)){
+    const isNa=m[1].toLowerCase()==="на", nums=m[2].match(/\d+/g), unit=m[3]?m[3].toLowerCase():"";
+    if(nums.length<2 && !unit) continue;
+    if(isNa && !unit && /^\s*[а-яёa-z]/i.test(text.slice(m.index+m[0].length))) continue;
+    const from=Math.max(text.lastIndexOf(".",m.index),text.lastIndexOf("\n",m.index),text.lastIndexOf(";",m.index))+1;
+    if(RE_CALL.test(text.slice(from,m.index))) continue;
+    const seps=m[2].split(/\d+/).slice(1,-1);
+    let s=nums[0];
+    nums.slice(1).forEach((n,i)=>{const sp=seps[i]; s+=(/[-–—]|до/.test(sp)?"–":/или/.test(sp)?" или ":/и/.test(sp)?" и ":/,/.test(sp)?", ":(nums.length===2&&unit&&+nums[0]<+n?"–":", "))+n;});
+    return {text:s+(unit?" "+unit:""),raw:m[0],drop:!isNa};
+  }
+  return null;
+}
+/* Несколько чисел после «аванс» / «предоплата»: «аванс 10-20-30», «аванс 10 20 30%» */
+const RE_ADVSEQ=/(?<![а-яё])(?:аванс[а-яё]*|предоплат[а-яё]*)\s*[:—–-]?\s*(\d{1,3}(?:(?:\s*[-–—,]\s*|\s+(?:и|или|до)\s+|\s+)\d{1,3})+)(?![\d.\/:])(?:\s*(%|процент[а-яё]*))?/gi;
+function findAdvSeq(text){
+  for(const m of text.matchAll(RE_ADVSEQ)){
+    if(/^\d{1,3}(?:\s\d{3})+$/.test(m[1])) continue;                       // «500 000» — это сумма
+    if(/^\s*(тыс|млн|миллион|руб|р\.|₽|т\.\s?р|к(?![а-яёa-z]))/i.test(text.slice(m.index+m[0].length))) continue;
+    const nums=m[1].match(/\d+/g), seps=m[1].split(/\d+/).slice(1,-1);
+    let s=nums[0];
+    nums.slice(1).forEach((n,i)=>{const sp=seps[i]; s+=(/[-–—]|до/.test(sp)?"–":/или/.test(sp)?" или ":/и/.test(sp)?" и ":", ")+n;});
+    return {text:s+(m[2]?"%":""),raw:m[0]};
+  }
+  return null;
+}
+function tidy(s){return s.replace(/\s+/g," ").replace(/\s+([,.;!?])/g,"$1").replace(/^[\s,.;:—–-]+/,"").replace(/[\s,;:—–-]+$/,"").trim();}
+function cap(s){return s?s[0].toUpperCase()+s.slice(1):s;}
+/* Телефон и имя клиента */
+function fmtPhone(digits){
+  let d=digits.replace(/\D/g,""); if(d.length===11&&(d[0]==="8"||d[0]==="7")) d=d.slice(1);
+  return d.length===10?"+7 "+d.slice(0,3)+" "+d.slice(3,6)+"-"+d.slice(6,8)+"-"+d.slice(8):digits.trim();
+}
+function findPhone(text){
+  const m=text.match(/(?:(?:тел(?:ефон)?|моб(?:ильный)?|номер)\.?\s*[:—–-]?\s*)?(?<![\d])(?:\+7|8|7)[\s\-]*\(?\d{3}\)?[\s\-]*\d{3}[\s\-]*\d{2}[\s\-]*\d{2}(?!\d)/i);
+  if(!m) return null;
+  return {text:fmtPhone(m[0].replace(/^[^+\d]+/,"")),raw:m[0]};
+}
+function findName(text){
+  const m=text.match(/(?:[Мм]еня зовут|[Кк]онтактное лицо|[Кк]онтакт|ФИО|[Фф]ио|[Ии]мя клиента|[Ии]мя|[Кк]лиент|[Зз]овут)\s*[:—–-]?\s*([А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+){0,2})(?![а-яё])/);
+  return m?{text:m[1],raw:m[0]}:null;
+}
+function parse(text,now){
+  const out={inn:"",name:"",phone:"",need:"",advance:"",term:"",termDate:null,call:null,callText:""};
+  let t=text.replace(/\r/g,"");
+  const ph=findPhone(t);
+  if(ph){out.phone=ph.text; t=t.replace(ph.raw," ");}
+  const nm=findName(t);
+  if(nm){out.name=nm.text; t=t.replace(nm.raw," ");}
+  const fi=findInn(t);
+  if(fi){out.inn=fi.inn; t=t.replace(fi.raw," ");}
+  const aq=findAdvSeq(t);
+  if(aq){out.advance=aq.text; t=t.replace(aq.raw," ");}
+  const sq=findSeq(t);
+  if(sq){out.term=sq.text; if(sq.drop) t=t.replace(sq.raw," ");}
+  const parts=t.split(/(\n+|(?<=[.!?;])\s+|,\s+)/);
+  const keep=[];
+  for(let i=0;i<parts.length;i+=2){
+    const seg=parts[i], sep=parts[i+1]||"";
+    if(!seg.trim()){continue;}
+    if(RE_CALL.test(seg) && !out.callText){ out.callText=tidy(seg); const w=parseWhen(seg,now); if(w){ if(!w.timeSet) w.date.setHours(10,0,0,0); out.call=w.date; } continue; }
+    if(RE_ADV.test(seg) && !out.advance){
+      if(/без\s+(аванс|предоплат)/i.test(seg)) out.advance="Без аванса";
+      else{
+        const pc=seg.match(/(\d{1,3}(?:\s*[-–—]\s*\d{1,3})?)\s*(?:%|процент)/i), mo=findMoney(seg);
+        out.advance=[pc?pc[1]+"%":"",mo||""].filter(Boolean).join(", ") || tidy(seg.replace(/[.!?;]+$/,""));
+      }
+      continue;
+    }
+    if(!out.term){ const dur=findRange(seg); if(dur){ out.term=dur; if(RE_TERM_START.test(seg)) continue; } }
+    if(RE_TERM_START.test(seg) && !out.term){
+      out.term=cap(tidy(seg.replace(/^\s*(срок\S*|дедлайн)(\s+(поставки|отгрузки|выполнения|исполнения|работ|доставки))?\s*[:—–-]?\s*/i,"").replace(/[.!?;]+$/,"")));
+      const w=parseWhen(seg,now); if(w) out.termDate=w.date; continue;
+    }
+    if(!out.term){ const m=seg.match(RE_TERM_IN); if(m){ out.term=cap(tidy(m[0])); const w=parseWhen(m[0],now); if(w) out.termDate=w.date; } }
+    keep.push(seg+(/\n/.test(sep)?" ":sep));
+  }
+  let need=tidy(keep.join(""));
+  need=need.replace(/^(добрый день|доброе утро|добрый вечер|здравствуйте|привет|приветствую)[!,.\s]*/i,"");
+  need=need.replace(/(^|[.!?]\s+)(ООО|АО|ИП|ПАО|ЗАО)\s*[,.]?\s*(?=[.!?]|$)/g,"$1");
+  out.need=cap(tidy(need)).replace(/([.!?]\s+)([а-яё])/g,(m,a,b)=>a+b.toUpperCase());
+  return out;
+}
+
+/* ---------- Хранилище ---------- */
+let db=null, local={companies:{},requests:[]}, items=[];
+const LS="razbor-zayavki";
+function lsLoad(){try{const v=JSON.parse(localStorage.getItem(LS)||"null"); if(v&&v.companies&&v.requests) local=v;}catch(e){}}
+function lsSave(){try{localStorage.setItem(LS,JSON.stringify(local));}catch(e){}}
+/* ЕГРЮЛ через DaData — работает, когда страница открыта файлом на компьютере */
+const IS_LOCAL=!!window.STANDALONE||location.protocol==="file:"||location.hostname==="localhost"||location.hostname==="127.0.0.1";
+const DD_LS="razbor-dadata-key";
+let ddKey=""; if(IS_LOCAL){try{ddKey=localStorage.getItem(DD_LS)||"";}catch(e){}}
+let ddState="";
+async function dadata(inn){
+  try{
+    const r=await fetch("https://suggestions.dadata.ru/suggestions/api/4_1/rs/findById/party",{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json","Authorization":"Token "+ddKey},body:JSON.stringify({query:inn,count:1})});
+    if(r.status===401||r.status===403){ddState="badkey";return null;}
+    if(!r.ok){ddState="error";return null;}
+    const j=await r.json(), x=j&&j.suggestions&&j.suggestions[0];
+    ddState="ok";
+    if(!x) return null;
+    const d=x.data||{}, name=(d.name&&(d.name.short_with_opf||d.name.full_with_opf))||x.value;
+    const st=d.state&&d.state.status;
+    const bad=st==="LIQUIDATED"?"ликвидирована":st==="LIQUIDATING"?"в процессе ликвидации":st==="BANKRUPT"?"банкротство":"";
+    return {name:String(name),src:bad?"ЕГРЮЛ: "+bad:"из ЕГРЮЛ",warn:!!bad};
+  }catch(e){ddState="error";return null;}
+}
+function renderDD(){
+  const box=$("dd-box"); if(!IS_LOCAL){box.hidden=true;return;}
+  box.hidden=false; const t=$("dd-text"); t.textContent="";
+  if(ddKey&&ddState!=="badkey"){
+    $("dd-form").hidden=true;
+    t.append(ddState==="error"?"Нет связи с DaData, название берётся из ваших клиентов. ":"Название компании подтягивается из ЕГРЮЛ (DaData). ");
+    const b=document.createElement("button");b.type="button";b.className="ghost";b.textContent="Сменить ключ";
+    b.addEventListener("click",()=>{ddKey="";ddState="";try{localStorage.removeItem(DD_LS);}catch(e){} renderDD();});
+    t.append(b);
+  }else{
+    $("dd-form").hidden=false;
+    t.append(ddState==="badkey"?"DaData не принял ключ. Проверьте его и вставьте заново. ":"Чтобы название подтягивалось из ЕГРЮЛ по ИНН, вставьте API-ключ DaData (бесплатно, до 10 000 запросов в день). ");
+    const a=document.createElement("a");a.href="https://dadata.ru/profile/#info";a.target="_blank";a.rel="noopener";a.textContent="Где взять ключ";
+    t.append(a);
+  }
+}
+async function lookupCompany(inn){
+  if(IS_LOCAL&&ddKey){ const r=await dadata(inn); renderDD(); if(r) return r; }
+  if(db){ try{ const s=await db.doc("companies/"+inn).get(); if(s.exists){const n=s.data().name; if(n) return {name:String(n),src:"из ваших клиентов"};} }catch(e){} }
+  else if(local.companies[inn]) return {name:local.companies[inn],src:"из ваших клиентов"};
+  if(BUILTIN[inn]) return {name:BUILTIN[inn],src:"пример"};
+  return null;
+}
+async function saveRecord(rec){
+  if(db){
+    if(rec.inn&&rec.company) await db.doc("companies/"+rec.inn).set({name:rec.company,updatedAt:rec.createdAt});
+    await db.collection("requests").add(rec);
+  }else{
+    if(rec.inn&&rec.company) local.companies[rec.inn]=rec.company;
+    local.requests.unshift(Object.assign({id:"l"+Date.now()},rec)); lsSave(); items=local.requests.slice(); renderList();
+  }
+}
+async function removeRecord(id){
+  if(db) await db.doc("requests/"+id).delete();
+  else{ local.requests=local.requests.filter(r=>r.id!==id); lsSave(); items=local.requests.slice(); renderList(); }
+}
+
+/* ---------- Интерфейс ---------- */
+const F={name:$("f-name"),phone:$("f-phone"),inn:$("f-inn"),company:$("f-company"),need:$("f-need"),advance:$("f-advance"),term:$("f-term"),call:$("f-call")};
+let lastInn=null, companyManual=false, callNote="";
+function setTag(el,text,cls){el.textContent=text||"";el.className="tag"+(cls?" "+cls:"");}
+function status(msg){$("status").textContent=msg||"";}
+
+async function onInn(){
+  const inn=F.inn.value.trim();
+  const hint=$("co-hint");
+  if(!inn){setTag($("inn-tag"),"");setTag($("co-tag"),"");hint.hidden=true;lastInn=null;return;}
+  const ok=innValid(inn);
+  setTag($("inn-tag"),ok?(inn.length===10?"юрлицо, верный":"ИП, верный"):"не проходит проверку",ok?"ok":"bad");
+  if(inn===lastInn) return;
+  lastInn=inn; companyManual=false;
+  const hit=ok?await lookupCompany(inn):null;
+  if(F.inn.value.trim()!==inn) return;
+  if(hit){F.company.value=hit.name;setTag($("co-tag"),hit.src,hit.warn?"warn":"ok");hint.hidden=true;}
+  else{
+    F.company.value="";setTag($("co-tag"),ok?"нет в ваших клиентах":"",ok?"warn":"");
+    if(ok){
+      hint.hidden=false;hint.textContent="";
+      hint.append("Впишите название один раз. После сохранения оно будет подставляться по этому ИНН. ");
+      const a=document.createElement("a");a.href="https://www.rusprofile.ru/search?query="+encodeURIComponent(inn);a.target="_blank";a.rel="noopener";a.textContent="Найти компанию по ИНН";
+      hint.append(a);
+    }else hint.hidden=true;
+  }
+}
+function formRec(){return {name:F.name.value.trim(),phone:F.phone.value.trim(),company:F.company.value.trim(),inn:F.inn.value.trim(),need:F.need.value.trim(),advance:F.advance.value.trim(),term:F.term.value.trim(),call:F.call.value||""};}
+function summaryOf(r){
+  const L=[];
+  if(r.company) L.push("Компания: "+r.company);
+  if(r.inn) L.push("ИНН: "+r.inn);
+  if(r.name) L.push("Клиент: "+r.name);
+  if(r.phone) L.push("Телефон: "+r.phone);
+  if(r.need) L.push("Потребность: "+r.need);
+  if(r.advance) L.push("Аванс: "+r.advance);
+  if(r.term) L.push("Срок: "+r.term);
+  if(r.call) L.push("Позвонить: "+fmtDT(r.call));
+  return L.join("\n");
+}
+function summary(){return summaryOf(formRec());}
+function whoOf(r){return r.company||(r.inn?"ИНН "+r.inn:"клиенту");}
+function refreshCal(){
+  setTag($("call-tag"),callNote||(F.call.value?"":"дата не указана"));
+}
+function runParse(){
+  const text=$("src").value;
+  $("example-mark").hidden=text!==EXAMPLE;
+  const r=parse(text,new Date());
+  F.name.value=r.name; F.phone.value=r.phone;
+  F.inn.value=r.inn; F.need.value=r.need; F.advance.value=r.advance;
+  F.term.value=r.term;
+  setTag($("term-tag"),r.termDate?"до "+fmtDate(r.termDate):"",r.termDate?"ok":"");
+  F.call.value=r.call?toLocalInput(r.call):"";
+  callNote=r.callText&&!r.call?"в тексте есть просьба о звонке, выберите время":"";
+  if($("call-tag")) $("call-tag").className="tag"+(callNote?" warn":"");
+  status(""); onInn().then(refreshCal); refreshCal();
+}
+let tmr=null;
+$("src").addEventListener("input",()=>{clearTimeout(tmr);tmr=setTimeout(runParse,200);});
+$("btn-clear").addEventListener("click",()=>{$("src").value="";runParse();$("src").focus();});
+F.inn.addEventListener("input",()=>{F.inn.value=F.inn.value.replace(/\D/g,"");onInn().then(refreshCal);});
+F.company.addEventListener("input",()=>{companyManual=true;setTag($("co-tag"),"");refreshCal();});
+["need","advance","term","call"].forEach(k=>F[k].addEventListener("input",()=>{ if(k==="call"){callNote="";$("call-tag").className="tag";} if(k==="term") setTag($("term-tag"),""); refreshCal();}));
+
+$("btn-copy").addEventListener("click",async()=>{
+  const s=summary(); if(!s){status("Карточка пустая");return;}
+  try{await navigator.clipboard.writeText(s);status("Скопировано");}
+  catch(e){status("Не удалось скопировать. Выделите поля вручную.");}
+});
+$("card").addEventListener("submit",async(ev)=>{
+  ev.preventDefault();
+  const rec={name:F.name.value.trim(),phone:F.phone.value.trim(),inn:F.inn.value.trim(),company:F.company.value.trim(),need:F.need.value.trim(),advance:F.advance.value.trim(),term:F.term.value.trim(),call:F.call.value||"",source:$("src").value.slice(0,4000),createdAt:new Date().toISOString()};
+  if(!rec.inn&&!rec.need&&!rec.company&&!rec.name&&!rec.phone){status("Нечего сохранять: заполните хотя бы одно поле");return;}
+  if(rec.inn&&!innValid(rec.inn)){status("ИНН не проходит проверку. Исправьте его или очистите поле.");F.inn.focus();return;}
+  const b=$("btn-save"); b.disabled=true; status("Сохраняю…");
+  try{ await saveRecord(rec); status("Сохранено"); if(rec.inn&&rec.company){setTag($("co-tag"),"из ваших клиентов","ok");$("co-hint").hidden=true;} }
+  catch(e){ status(e&&e.code==="quota_exceeded"?"Хранилище заполнено. Удалите старые заявки.":"Не удалось сохранить. Попробуйте ещё раз."); }
+  b.disabled=false;
+});
+
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
+function kv(label,val){const d=el("div","kv");d.append(el("b",null,label+" "),document.createTextNode(val||"—"));return d;}
+/* Статус звонка: жёлтый — время ещё не настало, зелёный — пора звонить (до конца этого дня), красный — день прошёл */
+function callState(v,now){
+  const d=new Date(v); if(!v||isNaN(d)) return null;
+  if(now<d) return {cls:"wait",text:"ещё рано"};
+  const end=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);
+  return now<end?{cls:"due",text:"пора звонить"}:{cls:"late",text:"просрочен"};
+}
+function callRow(r){
+  const st=callState(r.call,new Date());
+  if(!st) return kv("Звонок","");
+  const d=el("div","kv call "+st.cls);
+  d.append(el("b",null,"Звонок "),document.createTextNode(fmtDT(r.call)+" "),el("span","pill",st.text));
+  return d;
+}
+let armed=null, tab="all";
+function renderList(){
+  const box=$("list"); box.textContent="";
+  const now=new Date(), cnt={all:items.length,due:0,wait:0,late:0};
+  const stOf=r=>{const st=callState(r.call,now);return st?st.cls:"";};
+  for(const r of items){const c=stOf(r); if(c) cnt[c]++;}
+  for(const k in cnt) $("n-"+k).textContent=cnt[k];
+  const shown=tab==="all"?items:items.filter(r=>stOf(r)===tab);
+  if(items.length&&!shown.length){box.append(el("div","empty",{due:"Сейчас нет заявок, по которым пора звонить.",wait:"Нет заявок с предстоящим звонком.",late:"Просроченных звонков нет."}[tab]));return;}
+  if(!items.length){box.append(el("div","empty","Здесь появятся сохранённые заявки. Заполните карточку и нажмите «Сохранить заявку»."));return;}
+  for(const r of shown){
+    const row=el("div","item");
+    const c1=el("div"); c1.append(el("div","co",r.company||"Без названия"),el("div","sub mono",r.inn?"ИНН "+r.inn:"ИНН не указан"),...(r.name?[el("div","kv",r.name)]:[]),...(r.phone?[el("div","kv mono",r.phone)]:[]),el("div","sub","добавлено "+fmtDate(new Date(r.createdAt))));
+    const c2=el("div"); c2.append(el("div","lbl","Потребность"),el("div",null,r.need||"не указана"));
+    const c3=el("div"); c3.append(kv("Аванс",r.advance),kv("Срок",r.term),callRow(r));
+    const c4=el("div","actions");
+    const del=el("button","ghost",armed===r.id?"Точно удалить?":"Удалить"); del.type="button";
+    del.addEventListener("click",async()=>{ if(armed!==r.id){armed=r.id;renderList();return;} armed=null; try{await removeRecord(r.id);}catch(e){status("Не удалось удалить");} });
+    c4.append(del);
+    row.append(c1,c2,c3,c4); box.append(row);
+  }
+}
+
+$("dd-save").addEventListener("click",()=>{
+  const k=$("dd-key").value.trim(); if(!k) return;
+  ddKey=k; ddState=""; try{localStorage.setItem(DD_LS,k);}catch(e){}
+  $("dd-key").value=""; renderDD(); lastInn=null; onInn().then(refreshCal);
+});
+renderDD();
+$("tabs").addEventListener("click",ev=>{
+  const b=ev.target.closest("button[data-tab]"); if(!b) return;
+  tab=b.dataset.tab; armed=null;
+  for(const x of $("tabs").querySelectorAll("button")) x.setAttribute("aria-selected",x===b?"true":"false");
+  renderList();
+});
+setInterval(()=>{ if(items.length&&armed===null) renderList(); },30000);
+/* ---------- Запуск ---------- */
+$("src").value=EXAMPLE; runParse();
+(async()=>{
+  let got=null;
+  try{ got=window.claude&&window.claude.use?await window.claude.use("db"):null; }catch(e){}
+  if(got){
+    db=got; $("store-note").textContent="";
+    try{
+      db.collection("requests").orderBy("createdAt","desc").limit(200).onSnapshot(snap=>{
+        items=snap.docs.map(d=>Object.assign({id:d.id},d.data())); renderList();
+      },()=>{$("store-note").textContent="Список временно недоступен";});
+    }catch(e){}
+    lastInn=null; onInn();
+  }else{
+    lsLoad(); items=local.requests.slice(); renderList();
+    $("store-note").textContent="Сохраняется только в этом браузере";
+    lastInn=null; onInn();
+  }
+})();
+})();
+</script>
+
+</body>
+</html>
