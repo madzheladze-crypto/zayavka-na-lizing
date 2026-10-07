@@ -71,6 +71,12 @@ button:hover,.btn:hover{border-color:var(--accent)}
 .btn.cal{background:var(--accent-soft);border-color:transparent;color:var(--fg)}
 .btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
 button.ghost{border-color:transparent;background:transparent;color:var(--muted);padding:4px 8px;font-weight:500;font-size:13px}
+button.voice{padding:4px 10px;font-size:13px;font-weight:500}
+button.voice .mic{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+button.voice[aria-pressed="true"]{border-color:var(--bad);color:var(--bad)}
+button.voice[aria-pressed="true"] .mic{background:var(--bad);animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){button.voice[aria-pressed="true"] .mic{animation:none}}
 .status{font-size:13px;color:var(--muted)}
 .example{font-size:12px;color:var(--warn);font-weight:500}
 .journal{display:flex;flex-direction:column;gap:10px}
@@ -125,6 +131,7 @@ button.ghost{border-color:transparent;background:transparent;color:var(--muted);
         <h2>Текст заявки</h2>
         <span>
           <span class="example" id="example-mark">пример</span>
+          <button class="voice" id="btn-voice" type="button" aria-pressed="false" hidden><i class="mic"></i><span id="voice-label">Диктовать</span></button>
           <button class="ghost" id="btn-clear" type="button">Очистить</button>
         </span>
       </div>
@@ -218,6 +225,9 @@ function innValid(s){
 function findInn(text){
   const m=text.match(/инн\s*[:№#-]?\s*(\d{12}|\d{10})(?!\d)/i);
   if(m) return {inn:m[1],raw:m[0]};
+  // при диктовке цифры ИНН приходят группами: «ИНН 7707 083 893»
+  const g=text.match(/инн\s*[:№#-]?\s*((?:\d[ \-]?){9,11}\d)(?!\d)/i);
+  if(g){const dg=g[1].replace(/\D/g,""); if(dg.length===10||dg.length===12) return {inn:dg,raw:g[0]};}
   const all=[...text.matchAll(/(?<!\d)(\d{12}|\d{10})(?!\d)/g)].map(x=>x[1]);
   const v=all.find(innValid);
   return v?{inn:v,raw:v}:null;
@@ -312,7 +322,7 @@ function findRange(seg){
   return null;
 }
 /* Несколько чисел после «срок» или «на»: «срок 12-24-36», «на 3 5 7 лет», «на 12, 24 месяца» */
-const RE_SEQ=new RegExp("(?<![а-яёa-z])(срок[а-яё]*(?:\\s+(?:поставки|кредита|лизинга|договора|аренды|займа|рассрочки))?\\s*[:—–-]?|на)\\s+(\\d{1,3}(?:(?:\\s*[-–—,]\\s*|\\s+(?:и|или|до)\\s+|\\s+)\\d{1,3})*)(?![\\d.\\/:])(?!\\s*%)(?!\\s+"+MON_RE.replace("(","(?:")+")(?:\\s*(лет|года|год|мес\\.?|месяц[а-яё]*|дн[а-яё]*|день|дня|недел[а-яё]*)(?![а-яё]))?","gi");
+const RE_SEQ=new RegExp("(?<![а-яёa-z])((?:на\\s+)?срок[а-яё]*(?:\\s+(?:поставки|кредита|лизинга|договора|аренды|займа|рассрочки))?\\s*[:—–-]?|на)\\s+(\\d{1,3}(?:(?:\\s*[-–—,]\\s*|\\s+(?:и|или|до)\\s+|\\s+)\\d{1,3})*)(?![\\d.\\/:])(?!\\s*%)(?!\\s+"+MON_RE.replace("(","(?:")+")(?:\\s*(лет|года|год|мес\\.?|месяц[а-яё]*|дн[а-яё]*|день|дня|недел[а-яё]*)(?![а-яё]))?","gi");
 function findSeq(text){
   for(const m of text.matchAll(RE_SEQ)){
     const isNa=m[1].toLowerCase()==="на", nums=m[2].match(/\d+/g), unit=m[3]?m[3].toLowerCase():"";
@@ -354,7 +364,10 @@ function findPhone(text){
 }
 function findName(text){
   const m=text.match(/(?:[Мм]еня зовут|[Кк]онтактное лицо|[Кк]онтакт|ФИО|[Фф]ио|[Ии]мя клиента|[Ии]мя|[Кк]лиент|[Зз]овут)\s*[:—–-]?\s*([А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+){0,2})(?![а-яё])/);
-  return m?{text:m[1],raw:m[0]}:null;
+  if(m) return {text:m[1],raw:m[0]};
+  const v=text.match(/меня зовут\s+([а-яё]{2,})(?:\s+([а-яё]+(?:ов|ова|ев|ева|ин|ина|ский|ская|ко|ян|дзе|швили|ич|вна)))?(?![а-яё])/i);   // надиктованное имя без заглавных
+  if(v) return {text:[v[1],v[2]].filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1).toLowerCase()).join(" "),raw:v[0]};
+  return null;
 }
 function parse(text,now){
   const out={inn:"",name:"",phone:"",need:"",advance:"",term:"",termDate:null,call:null,callText:""};
@@ -369,6 +382,8 @@ function parse(text,now){
   if(aq){out.advance=aq.text; t=t.replace(aq.raw," ");}
   const sq=findSeq(t);
   if(sq){out.term=sq.text; if(sq.drop) t=t.replace(sq.raw," ");}
+  // текст без запятых (например, надиктованный): делим перед ключевыми словами
+  t=t.replace(/(?<![,.;!?\n\s])(?<!(?:^|\s)без)(?<!(?:^|\s)на)[ \t]+(?=(?:без\s+)?(?:аванс|предоплат)|(?:на\s+)?срок|дедлайн|позвон|перезвон|созвон|набрать|наберите|свяжитесь|связаться)/gi,", ");
   const parts=t.split(/(\n+|(?<=[.!?;])\s+|,\s+)/);
   const keep=[];
   for(let i=0;i<parts.length;i+=2){
@@ -592,6 +607,35 @@ function showView(v){
   if(v==="saved") renderList();
 }
 $("views").addEventListener("click",ev=>{const b=ev.target.closest("button[data-view]"); if(b) showView(b.dataset.view);});
+/* ---------- Голосовой ввод ---------- */
+(function(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition, btn=$("btn-voice");
+  if(!SR||!IS_LOCAL) return;                       // на странице в Claude микрофон недоступен
+  btn.hidden=false;
+  let rec=null, on=false, base="";
+  const setOn=v=>{on=v;btn.setAttribute("aria-pressed",v?"true":"false");$("voice-label").textContent=v?"Остановить":"Диктовать";};
+  const join=(a,b)=>!b?a:(a&&!/\s$/.test(a)?a+" ":a)+b;
+  function start(){
+    rec=new SR(); rec.lang="ru-RU"; rec.continuous=true; rec.interimResults=true;
+    base=$("src").value; if(base===EXAMPLE) base="";
+    rec.onresult=ev=>{
+      let fin="",tmp="";
+      for(let i=0;i<ev.results.length;i++){const t=ev.results[i][0].transcript; if(ev.results[i].isFinal) fin=join(fin,t.trim()); else tmp+=t;}
+      $("src").value=join(join(base,fin),tmp.trim());
+      clearTimeout(tmr); tmr=setTimeout(runParse,250);
+    };
+    rec.onerror=ev=>{
+      const e=ev.error;
+      if(e==="not-allowed"||e==="service-not-allowed") status("Нет доступа к микрофону. Разрешите его для этой программы в настройках браузера.");
+      else if(e==="network") status("Диктовке нужен интернет. Без сети используйте диктовку macOS: дважды нажмите Fn.");
+      else if(e==="audio-capture") status("Микрофон не найден.");
+      else if(e!=="no-speech"&&e!=="aborted") status("Диктовка остановилась, попробуйте ещё раз.");
+    };
+    rec.onend=()=>{setOn(false);runParse();};
+    try{rec.start();setOn(true);status("Говорите…");}catch(e){setOn(false);status("Не удалось включить микрофон.");}
+  }
+  btn.addEventListener("click",()=>{ if(on){try{rec.stop();}catch(e){} status("");} else start(); });
+})();
 $("tabs").addEventListener("click",ev=>{
   const b=ev.target.closest("button[data-tab]"); if(!b) return;
   tab=b.dataset.tab; armed=null;
