@@ -206,6 +206,7 @@ button.voice[aria-pressed="true"] .mic{background:var(--bad);animation:pulse 1.1
     </div>
     <div class="list" id="list"><div class="empty">Здесь появятся сохранённые заявки. Заполните карточку и нажмите «Сохранить заявку».</div></div>
   </section>
+  <p class="hint ver">Версия 16 · 07.10.2026</p>
 </div>
 
 <script>
@@ -610,8 +611,9 @@ $("views").addEventListener("click",ev=>{const b=ev.target.closest("button[data-
 /* ---------- Голосовой ввод ---------- */
 (function(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition, btn=$("btn-voice");
-  if(!SR||!IS_LOCAL) return;                       // на странице в Claude микрофон недоступен
+  if(!IS_LOCAL) return;                            // на странице в Claude микрофон недоступен
   btn.hidden=false;
+  if(!SR){ btn.addEventListener("click",()=>status("Здесь распознавание речи недоступно. Поставьте курсор в поле текста и дважды нажмите Fn — включится диктовка macOS. Либо откройте программу в Safari или Chrome.")); return; }
   let rec=null, on=false, base="";
   const setOn=v=>{on=v;btn.setAttribute("aria-pressed",v?"true":"false");$("voice-label").textContent=v?"Остановить":"Диктовать";};
   const join=(a,b)=>!b?a:(a&&!/\s$/.test(a)?a+" ":a)+b;
